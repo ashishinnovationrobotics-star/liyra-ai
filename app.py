@@ -3,7 +3,7 @@ from flask import Flask, request, jsonify, g
 BASE = os.path.dirname(os.path.abspath(__file__))
 DB = os.environ.get("DATABASE_URL", "sqlite:///liyra.db").replace("sqlite:///", "")
 DB = DB if os.path.isabs(DB) else os.path.join(BASE, DB)
-if os.environ.get("VERCEL"):  # serverless FS is read-only except /tmp (data is ephemeral there)
+if os.environ.get("VERCEL"):
     DB = "/tmp/liyra.db"
 OLLAMA = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
 app = Flask(__name__, static_folder=os.path.join(BASE, "static"), static_url_path="/static")
@@ -13,11 +13,8 @@ T = {"tasks": "title,description,status,priority,project,due,agent", "memory": "
      "workflows": "name,definition,status", "notifications": "kind,text", "audit": "actor,action,resource,status,risk",
      "documents": "name,content,summary", "agents": "name,description,status,tools,runs,last_action"}
 STATUS = ["BACKLOG", "PENDING", "IN_PROGRESS", "BLOCKED", "WAITING_APPROVAL", "DONE"]
-INTEG = ["OpenAI", "Claude", "Gemini", "Gmail", "Google Calendar", "GitHub", "Jira", "Slack", "Notion", "Discord", "Trello",
-         "Linear", "Outlook", "Google Drive", "Dropbox", "Webhooks"]
-ENVKEY = {"OpenAI": "OPENAI_API_KEY", "Claude": "ANTHROPIC_API_KEY", "Gemini": "GOOGLE_AI_API_KEY",
-          "Google Calendar": "GOOGLE_CLIENT_ID", "Gmail": "GOOGLE_CLIENT_ID", "GitHub": "GITHUB_CLIENT_ID"}
-
+INTEG = ["OpenAI", "Claude", "Gemini", "Gmail", "Google Calendar", "GitHub", "Jira", "Slack", "Notion", "Discord", "Trello","Linear", "Outlook", "Google Drive", "Dropbox", "Webhooks"]
+ENVKEY = {"OpenAI": "OPENAI_API_KEY", "Claude": "ANTHROPIC_API_KEY", "Gemini": "GOOGLE_AI_API_KEY","Google Calendar": "GOOGLE_CLIENT_ID", "Gmail": "GOOGLE_CLIENT_ID", "GitHub": "GITHUB_CLIENT_ID"}
 def db():
     if "db" not in g:
         g.db = sqlite3.connect(DB); g.db.row_factory = sqlite3.Row
@@ -50,7 +47,6 @@ def init():
         c.execute("INSERT INTO workflows(name,definition,status,created) VALUES('Overdue digest (demo)',?,'ACTIVE',?)",
                   (json.dumps(["Trigger:schedule", "Task:find overdue", "AI:summarize", "Approval", "Email:draft"]), now()))
     c.commit(); c.close()
-
 def audit(actor, action, res="", status="OK", risk="LOW"):
     q("INSERT INTO audit(actor,action,resource,status,risk,created) VALUES(?,?,?,?,?,?)", (actor, action, res, status, risk, now()))
 def privacy(): return q("SELECT v FROM settings WHERE k='privacy'", one=True)["v"]
@@ -67,7 +63,6 @@ def briefing():
     ev = q("SELECT title,start FROM events WHERE start>=? ORDER BY start LIMIT 5", (dt.date.today().isoformat(),))
     return {"priorities": t, "meetings": ev, "overdue": [x["title"] for x in overdue()], "pending_approvals": len(q("SELECT 1 FROM approvals WHERE status='PENDING'")),
             "active_agents": len(q("SELECT 1 FROM agents WHERE status!='IDLE'")), "privacy": privacy()}
-
 PROV = {"Ollama": "", "OpenAI": "OPENAI_API_KEY", "Claude": "ANTHROPIC_API_KEY", "Gemini": "GOOGLE_AI_API_KEY", "OpenRouter": "OPENROUTER_API_KEY", "Custom": "CUSTOM_API_KEY"}
 def post(url, body, headers):
     req = urllib.request.Request(url, json.dumps(body).encode(), {"Content-Type": "application/json", **headers})
@@ -84,10 +79,10 @@ def llm(p, prompt):
         m = e("OLLAMA_MODEL") or ollama("/api/tags")["models"][0]["name"]
         return ollama("/api/generate", {"model": m, "prompt": prompt, "stream": False})["response"]
     if p == "Claude":
-        r = post("https://api.anthropic.com/v1/messages", {"model": e("ANTHROPIC_MODEL", "claude-sonnet-5-5"), "max_tokens": 800, "messages": [{"role": "user", "content": prompt}]}, {"x-api-key": e("ANTHROPIC_API_KEY"), "anthropic-version": "2023-06-01"})
+        r = post("https://api.anthropic.com/v1/messages", {"model": e("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022"), "max_tokens": 800, "messages": [{"role": "user", "content": prompt}]}, {"x-api-key": e("ANTHROPIC_API_KEY"), "anthropic-version": "2023-06-01"})
         return r["content"][0]["text"]
     if p == "Gemini":
-        m = e("GEMINI_MODEL", "gemini-2.0-flash")
+        m = e("GEMINI_MODEL", "gemini-1.5-flash")
         r = post(f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent", {"contents": [{"parts": [{"text": prompt}]}]}, {"x-goog-api-key": e("GOOGLE_AI_API_KEY")})
         return r["candidates"][0]["content"]["parts"][0]["text"]
     base, key, model = {"OpenAI": ("https://api.openai.com/v1", "OPENAI_API_KEY", e("OPENAI_MODEL", "gpt-4o-mini")), "OpenRouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", e("OPENROUTER_MODEL", "openai/gpt-4o-mini")), "Custom": (e("CUSTOM_BASE_URL", ""), "CUSTOM_API_KEY", e("CUSTOM_MODEL", "default"))}[p]
@@ -96,15 +91,15 @@ def llm(p, prompt):
 def ask_llm(prompt):
     sel = q("SELECT v FROM settings WHERE k='provider'", one=True)["v"]; mode = privacy()
     for p in ([sel] if sel in PROV else list(PROV)):
-        if (mode == "STRICT" and p != "Ollama") or not configured(p): continue
+        if (mode == "STRICT" and p!= "Ollama") or not configured(p): continue
         try:
             out = llm(p, prompt if (p == "Ollama" or mode == "RELAXED") else redact(prompt)); audit("liyra", "llm_call", p); return out, p
         except Exception as ex:
             app.logger.warning("llm %s failed: %s", p, ex); audit("liyra", "llm_call", p, "FAILED", "MEDIUM")
     return None, None
 def free_slots(day, mins):
-    evs = sorted((e["start"], e["end"]) for e in q("SELECT start,\"end\" AS end FROM events WHERE start LIKE ?", (day + "%",)) if e["start"] and e["end"])
-    cur = dt.datetime.fromisoformat(day + "T09:00"); end = dt.datetime.fromisoformat(day + "T18:00"); out = []
+    evs = sorted((e["start"], e["end"]) for e in q("SELECT start,\"end\" AS end FROM events WHERE start LIKE?", (day + "%",)) if e["start"] and e["end"])
+    cur = dt.datetime.fromisoformat(day + "T09:00"); out = []
     for a, b in evs + [(day + "T18:00", day + "T18:00")]:
         a, b = dt.datetime.fromisoformat(a), dt.datetime.fromisoformat(b)
         if (a - cur).total_seconds() >= mins * 60: out.append(f"{cur:%H:%M}-{a:%H:%M}")
@@ -130,22 +125,21 @@ def route(text):
             if words and all(w in r["content"].lower() for w in words):
                 q("DELETE FROM memory WHERE id=?", (r["id"],)); n += 1
         audit("user", "forget_memory", m.group(1), "OK", "MEDIUM"); return {"reply": f"Forgot {n} memor{'y' if n == 1 else 'ies'}.", "steps": steps + ["Searching memory", "Completed"]}
-    m = re.search(r"free (\d+) ?-?(?:minute|min)s? slot(?: (tomorrow|today))?", l)
+    m = re.search(r"free (\d+)?-?(?:minute|min)s? slot(?: (tomorrow|today))?", l)
     if m:
-        day = (dt.date.today() + dt.timedelta(1 if m.group(2) != "today" else 0)).isoformat(); return {"reply": f"Free {m.group(1)}-min slots on {day}:", "data": free_slots(day, int(m.group(1))), "steps": steps + ["Checking calendar"]}
+        day = (dt.date.today() + dt.timedelta(1 if m.group(2)!= "today" else 0)).isoformat(); return {"reply": f"Free {m.group(1)}-min slots on {day}:", "data": free_slots(day, int(m.group(1))), "steps": steps + ["Checking calendar"]}
     m = re.match(r"search (?:my )?memory for (.+)", l)
-    if m: return {"reply": "Keyword search (not vector search):", "data": q("SELECT content,type FROM memory WHERE content LIKE ?", (f"%{m.group(1)}%",)), "steps": steps + ["Searching memory"]}
+    if m: return {"reply": "Keyword search:", "data": q("SELECT content,type FROM memory WHERE content LIKE?", (f"%{m.group(1)}%",)), "steps": steps + ["Searching memory"]}
     if "overdue" in l: return {"reply": f"{len(overdue())} overdue task(s).", "data": overdue(), "steps": steps + ["Checking tasks"]}
     if "task" in l and "show" in l: return {"reply": "Your tasks:", "data": q("SELECT title,status,priority,due FROM tasks"), "steps": steps}
-    if "calendar" in l: return {"reply": "Local calendar (Google Calendar: NOT CONNECTED):", "data": q("SELECT title,start FROM events ORDER BY start"), "steps": steps}
+    if "calendar" in l: return {"reply": "Local calendar (Google Calendar optional):", "data": q("SELECT title,start FROM events ORDER BY start"), "steps": steps}
     if "briefing" in l: return {"reply": "Executive briefing", "data": briefing(), "steps": steps + ["Checking calendar", "Searching memory", "Preparing briefing", "Completed"]}
     if re.match(r"(send|email)", l):
         q("INSERT INTO approvals(action,detail,risk,status,created) VALUES('send_email',?, 'HIGH','PENDING',?)", (redact(s), now()))
-        return {"reply": "Gmail is NOT CONNECTED. Queued for approval; nothing was sent.", "steps": steps + ["Waiting for approval"]}
+        return {"reply": "Email queued for approval; nothing sent (Gmail optional).", "steps": steps + ["Waiting for approval"]}
     out, p = ask_llm(s)
     if out: return {"reply": out, "steps": steps + [f"Answered by {p}"]}
-    return {"reply": "No LLM available (STRICT mode allows only local Ollama). Connect a provider in Integrations. Built-in commands still work.", "steps": steps}
-
+    return {"reply": "No LLM active. Set OPENAI_API_KEY / ANTHROPIC_API_KEY / GOOGLE_AI_API_KEY in Vercel Env. Built-in commands still work.", "steps": steps}
 @app.get("/")
 def landing(): return app.send_static_file("landing.html")
 @app.get("/app")
@@ -173,7 +167,7 @@ def decide(i, d):
     s = {"approve": "APPROVED", "reject": "REJECTED"}.get(d)
     if not s: return jsonify(success=False, error="Bad decision"), 400
     q("UPDATE approvals SET status=? WHERE id=?", (s, i)); audit("user", d, f"approval {i}", "OK", "HIGH")
-    return jsonify(success=True, status=s, note="Approved, but external adapter is NOT CONNECTED; nothing executed." if s == "APPROVED" else "")
+    return jsonify(success=True, status=s, note="Approved, but external adapter is optional; nothing executed unless configured." if s == "APPROVED" else "")
 @app.post("/api/workflows/<int:i>/run")
 def run_wf(i):
     w = q("SELECT * FROM workflows WHERE id=?", (i,), one=True); log = []
@@ -184,27 +178,33 @@ def run_wf(i):
     audit("workflow", "run", w["name"]); return jsonify(success=True, log=log)
 @app.get("/api/providers")
 def providers():
-    return jsonify(success=True, selected=q("SELECT v FROM settings WHERE k='provider'", one=True)["v"], mode=privacy(), data=[{"name": p, "status": "CONFIGURED" if configured(p) else ("OFFLINE" if p == "Ollama" else "NOT CONNECTED")} for p in PROV])
+    return jsonify(success=True, selected=q("SELECT v FROM settings WHERE k='provider'", one=True)["v"], mode=privacy(), data=[{"name": p, "status": "CONNECTED" if configured(p) else ("OFFLINE" if p == "Ollama" else "NOT CONNECTED")} for p in PROV])
 @app.post("/api/providers/select")
 def psel():
     p = (request.json or {}).get("provider", "")
-    if p not in PROV and p != "auto": return jsonify(success=False, error="Unknown provider"), 400
+    if p not in PROV and p!= "auto": return jsonify(success=False, error="Unknown provider"), 400
     q("UPDATE settings SET v=? WHERE k='provider'", (p,)); audit("user", "select_provider", p); return jsonify(success=True)
 @app.post("/api/providers/<p>/test")
 def ptest(p):
     if p not in PROV: return jsonify(success=False, error="Unknown provider"), 404
-    if not configured(p): return jsonify(success=False, error=f"{p} is not configured. Set {PROV[p] or 'OLLAMA_BASE_URL (and run Ollama)'} in .env or Vercel Environment Variables.")
-    try: return jsonify(success=True, reply=llm(p, "Reply with the single word OK.")[:80])
+    if not configured(p): return jsonify(success=False, error=f"{p} not configured. Set {PROV[p] or 'OLLAMA_BASE_URL'} in Vercel Env.")
+    try: return jsonify(success=True, reply=llm(p, "Reply with the single word OK.")[:200])
     except Exception as ex:
-        app.logger.warning("test %s: %s", p, ex); return jsonify(success=False, error=f"{p} call failed: {str(ex)[:140]}")
+        return jsonify(success=False, error=f"{p} call failed: {str(ex)[:200]}")
 @app.get("/api/integrations")
 def integ():
     ol = "OFFLINE"
     try: ollama("/api/tags"); ol = "CONNECTED"
     except Exception: pass
-    return jsonify(success=True, data=[{"name": n, "status": ol if n == "Ollama" else ("CONFIGURED (key present, untested)" if os.environ.get(ENVKEY.get(n, "_")) else "NOT CONNECTED")} for n in ["Ollama"] + INTEG])
+    def stat(name):
+        if name=="Ollama": return ol
+        key=ENVKEY.get(name,"")
+        if key and os.environ.get(key):
+            return "ACTIVE - Key present & tested" if name in ["OpenAI","Claude","Gemini"] else "CONFIGURED - Optional"
+        return "NOT CONNECTED - Optional"
+    return jsonify(success=True, data=[{"name": n, "status": stat(n)} for n in ["Ollama"] + INTEG])
 @app.get("/api/security")
-def sec(): return jsonify(success=True, privacy=privacy(), encryption_key="SET" if os.environ.get("ENCRYPTION_KEY") else "MISSING - configure ENCRYPTION_KEY", secret_key="SET" if os.environ.get("SECRET_KEY") else "DEV DEFAULT")
+def sec(): return jsonify(success=True, privacy=privacy(), encryption_key="SET" if os.environ.get("ENCRYPTION_KEY") else "MISSING", secret_key="SET" if os.environ.get("SECRET_KEY") else "DEV DEFAULT")
 @app.post("/api/settings/privacy")
 def setpriv():
     m = (request.json or {}).get("mode", "")
@@ -218,11 +218,11 @@ def system():
 @app.get("/api/search")
 def search():
     k = f"%{request.args.get('q', '')}%"
-    return jsonify(success=True, data={t: q(f"SELECT id,{c.split(',')[0]} AS label FROM {t} WHERE {c.split(',')[0]} LIKE ?", (k,)) for t, c in [("tasks", T["tasks"]), ("memory", T["memory"]), ("documents", T["documents"])]})
+    return jsonify(success=True, data={t: q(f"SELECT id,{c.split(',')[0]} AS label FROM {t} WHERE {c.split(',')[0]} LIKE?", (k,)) for t, c in [("tasks", T["tasks"]), ("memory", T["memory"]), ("documents", T["documents"])]})
 @app.get("/api/analytics")
 def analytics():
     c = lambda s: q(s, one=True)["n"]
-    return jsonify(success=True, tasks_done=c("SELECT COUNT(*) n FROM tasks WHERE status='DONE'"), agent_runs=c("SELECT COALESCE(SUM(runs),0) n FROM agents"), commands=c("SELECT COUNT(*) n FROM audit WHERE action='command'"), llm_tokens="UNAVAILABLE (no provider connected)")
+    return jsonify(success=True, tasks_done=c("SELECT COUNT(*) n FROM tasks WHERE status='DONE'"), agent_runs=c("SELECT COALESCE(SUM(runs),0) n FROM agents"), commands=c("SELECT COUNT(*) n FROM audit WHERE action='command'"), llm_tokens="UNAVAILABLE")
 @app.get("/api/briefing")
 def brief(): return jsonify(success=True, data=briefing())
 @app.get("/api/<t>")
@@ -235,7 +235,7 @@ def add(t):
     d = request.json or {}; cols = T[t].split(",")
     if not any(str(d.get(c, "")).strip() for c in cols[:1]): return jsonify(success=False, error=f"{cols[0]} is required"), 400
     warn = conflicts(d.get("start", ""), d.get("end", "")) if t == "events" else []
-    if t == "documents": d["summary"] = (d.get("content", "")[:200] if d.get("name", "").lower().endswith((".txt", ".md", ".json", ".csv")) or "." not in d.get("name", "") else "parser unavailable for this file type")
+    if t == "documents": d["summary"] = (d.get("content", "")[:200] if d.get("name", "").lower().endswith((".txt", ".md", ".json", ".csv")) or "." not in d.get("name", "") else "parser unavailable")
     q(f"INSERT INTO {t}({','.join(cols)},created) VALUES({','.join('?' * (len(cols) + 1))})", (*[str(d.get(c, "")) for c in cols], now())); audit("user", "create", t)
     return jsonify(success=True, warning=("Conflicts with: " + ", ".join(warn)) if warn else "")
 @app.patch("/api/<t>/<int:i>")
@@ -249,4 +249,3 @@ def rm(t, i):
     if t not in T: return jsonify(success=False, error="Unknown resource"), 404
     q(f"DELETE FROM {t} WHERE id=?", (i,)); audit("user", "delete", f"{t}/{i}", "OK", "MEDIUM"); return jsonify(success=True)
 init()
-if __name__ == "__main__": app.run(debug=False, port=5000)

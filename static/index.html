@@ -1,68 +1,108 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Liyra AI</title>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Liyra AI — Console</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#050A14;--c:#00F0FF;--i:#4F46E5;--g:#10B981;--a:#F59E0B;--r:#EF4444;--t:#d7e6f5;--m:#7d93ab}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);background-image:linear-gradient(rgba(0,240,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,240,255,.04) 1px,transparent 1px);background-size:36px 36px;color:var(--t);font:15px/1.5 "Segoe UI",system-ui,sans-serif;display:flex;min-height:100vh}
-nav{width:200px;padding:16px 10px;border-right:1px solid rgba(0,240,255,.12);position:sticky;top:0;height:100vh;overflow:auto;flex:none}
-nav b{display:block;color:var(--c);font-size:20px;letter-spacing:.12em;padding:0 10px 12px}nav button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--m);padding:8px 10px;border-radius:10px;cursor:pointer;font:inherit}
-nav button.on,nav button:hover{color:var(--c);background:rgba(0,240,255,.08)}
-main{flex:1;padding:18px 22px 110px;min-width:0}header{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:16px}header .st{color:var(--g)}header .sp{flex:1}
-.card{background:rgba(255,255,255,.03);border:1px solid rgba(0,240,255,.18);border-radius:20px;padding:16px;backdrop-filter:blur(10px);box-shadow:0 0 24px rgba(0,240,255,.06);margin-bottom:14px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}.kan{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
-h2{margin:0 0 12px;font-weight:600}button.b,input,select,textarea{background:rgba(0,240,255,.07);border:1px solid rgba(0,240,255,.25);color:var(--t);border-radius:10px;padding:7px 11px;font:inherit}
-button.b{cursor:pointer}button.b:hover{background:rgba(0,240,255,.2)}button.x{border-color:rgba(239,68,68,.5)}
-:focus-visible{outline:2px solid var(--c);outline-offset:2px}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:7px 8px;border-bottom:1px solid rgba(255,255,255,.06);vertical-align:top}th{color:var(--m);font-weight:500}
-.tag{padding:2px 9px;border-radius:99px;border:1px solid currentColor;font-size:12px}.ok{color:var(--g)}.warn{color:var(--a)}.bad{color:var(--r)}.mut{color:var(--m)}
-.big{font-size:28px;color:var(--c)}canvas{width:100%;height:220px;display:block}
-#bar{position:fixed;left:200px;right:0;bottom:0;padding:12px 22px;background:rgba(5,10,20,.92);border-top:1px solid rgba(0,240,255,.2);display:flex;gap:8px;backdrop-filter:blur(10px)}#bar input{flex:1}
-#out{position:fixed;left:222px;right:22px;bottom:68px;max-height:40vh;overflow:auto;display:none}pre{white-space:pre-wrap;margin:0;font:13px/1.4 ui-monospace,monospace}
-@media(max-width:700px){nav{position:fixed;z-index:5;transform:translateX(-100%);background:var(--bg);transition:.2s}nav.open{transform:none}#bar{left:0}#out{left:12px;right:12px}#menu{display:inline-block!important}}
-#menu{display:none}@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+:root{--bg:#050A14;--c:#00F0FF;--c2:#7C3AED;--g:#10B981;--a:#F59E0B;--r:#EF4444;--t:#d7e6f5;--m:#7d93ab}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);background-image:linear-gradient(rgba(0,240,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,240,255,.04) 1px,transparent 1px);background-size:36px 36px;color:var(--t);font:14px/1.5 "Space Grotesk",system-ui;display:flex;min-height:100vh}
+nav{width:220px;padding:14px 10px;border-right:1px solid rgba(0,240,255,.14);position:sticky;top:0;height:100vh;overflow:auto;flex:none;background:rgba(5,10,20,0.92);backdrop-filter:blur(10px);display:flex;flex-direction:column;gap:6px}
+nav b{display:block;color:var(--c);font-size:20px;letter-spacing:.14em;padding:6px 10px 10px;text-shadow:0 0 10px var(--c);cursor:pointer}
+nav button{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;background:none;border:1px solid transparent;color:var(--m);padding:9px 11px;border-radius:11px;cursor:pointer;font:inherit;transition:.2s}
+nav button.on,nav button:hover{color:var(--c);background:rgba(0,240,255,.09);border-color:rgba(0,240,255,.18);box-shadow:0 0 14px rgba(0,240,255,.12)}
+main{flex:1;padding:14px 20px 110px;min-width:0}
+.topbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;background:rgba(5,10,20,0.9);border:1px solid rgba(0,240,255,.14);border-radius:14px;padding:10px 14px;backdrop-filter:blur(10px)}
+.st{color:var(--g);font-size:12px;font-family:'JetBrains Mono'}.mut{color:var(--m)}
+.card{background:rgba(255,255,255,.04);border:1px solid rgba(0,240,255,.18);border-radius:18px;padding:14px;backdrop-filter:blur(12px);box-shadow:0 0 24px rgba(0,240,255,.06);margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}.kan{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+h2{margin:0 0 10px;font-weight:700;font-size:18px}button.b,input,select,textarea{background:rgba(0,240,255,.07);border:1px solid rgba(0,240,255,.25);color:var(--t);border-radius:10px;padding:8px 12px;font:inherit}
+button.b{cursor:pointer;transition:.2s}button.b:hover{background:rgba(0,240,255,.18)}button.x{border-color:rgba(239,68,68,.5)}
+table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:7px 8px;border-bottom:1px solid rgba(255,255,255,.06);vertical-align:top}th{color:var(--m);font-weight:500;font-size:12px}
+.tag{padding:3px 10px;border-radius:99px;border:1px solid currentColor;font-size:11px;font-family:'JetBrains Mono'}.ok{color:var(--g)}.warn{color:var(--a)}.bad{color:var(--r)}
+.big{font-size:24px;color:var(--c);font-weight:700}canvas{width:100%;height:220px;display:block;border-radius:14px}
+#bar{position:fixed;left:220px;right:0;bottom:0;padding:10px 16px;background:rgba(5,10,20,.94);border-top:1px solid rgba(0,240,255,.22);display:flex;gap:8px;backdrop-filter:blur(12px);z-index:20;align-items:center}
+#bar input{flex:1;padding:12px 16px;border-radius:12px}
+#out{position:fixed;left:232px;right:16px;bottom:68px;max-height:38vh;overflow:auto;display:none;z-index:19}
+pre{white-space:pre-wrap;margin:0;font:12px/1.4 "JetBrains Mono",monospace}
+@media(max-width:760px){nav{position:fixed;z-index:30;transform:translateX(-100%);transition:.25s}nav.open{transform:none}#bar{left:0}#out{left:10px;right:10px}#menu{display:inline-block!important}}
+#menu{display:none}
+.select-small{background:#0a1428;color:#fff;border:1px solid rgba(0,240,255,.28);padding:6px 8px;border-radius:8px;font-size:11px}
 </style></head><body>
-<nav id="nav" aria-label="Main"><b>LIYRA</b></nav>
-<main><header><button id="menu" class="b" aria-label="Menu">☰</button><span class="st">● System status: optimal</span><span id="clock" class="mut"></span><span class="sp"></span>
-<input id="gs" placeholder="Global search" aria-label="Global search"><span id="priv" class="tag warn"></span></header><div id="v" aria-live="polite"></div></main>
-<div id="out" class="card" role="log"><pre id="pre"></pre></div>
-<div id="bar"><button class="b" id="mic" aria-label="Talk to Liyra">🎙</button><input id="cmd" placeholder="Talk to Liyra… (Ctrl/Cmd+K)" aria-label="Command"><button class="b" id="go">Ask</button><span id="vs" class="mut">IDLE</span></div>
+<nav id="nav"><b onclick="location.href='/'">LIYRA ← HOME</b><div style="display:flex;gap:6px;padding:0 6px 8px"><button class="b" style="flex:1;font-size:11px" onclick="location.href='/'">🏠 Landing</button><button class="b" style="flex:1;font-size:11px" onclick="location.reload()">⟳ Refresh</button></div></nav>
+<main>
+<div class="topbar">
+<button id="menu" class="b">☰</button>
+<span class="st">● System optimal</span><span id="clock" class="mut" style="font-family:'JetBrains Mono';font-size:11px"></span>
+<span style="flex:1"></span>
+<select id="voiceSelect" class="select-small" title="Choose Voice"></select>
+<select id="modelSelect" class="select-small"><option>Auto (Best)</option><option>OpenAI</option><option>Claude</option><option>Gemini</option><option>Ollama</option></select>
+<label class="mut" style="font-size:11px;display:flex;align-items:center;gap:4px"><input type="checkbox" id="speakToggle" checked> Speak Reply</label>
+<input id="gs" placeholder="Global search" style="max-width:160px"><span id="priv" class="tag warn"></span>
+<span id="vs" class="mut" style="font-family:'JetBrains Mono';font-size:11px">IDLE</span>
+</div>
+<div id="v"></div>
+</main>
+<div id="out" class="card"><pre id="pre"></pre><div style="text-align:right;margin-top:8px"><button class="b" onclick="document.getElementById('out').style.display='none'">Close</button></div></div>
+<div id="bar"><button class="b" id="mic" title="Voice input">🎙</button><input id="cmd" placeholder="Talk to Liyra… Ask anything, create task, remember, briefing (Ctrl+K)"><button class="b" id="go">Ask →</button></div>
 <script>
-onerror=(m)=>{document.body.insertAdjacentHTML('afterbegin','<p class="bad" style="position:fixed;top:0;z-index:9">UI error: '+m+'</p>')};
-const $=s=>document.querySelector(s),api=async(p,m='GET',b)=>{try{const r=await fetch('/api/'+p,{method:m,headers:{'Content-Type':'application/json'},body:b&&JSON.stringify(b)});return await r.json()}catch(e){return{success:false,error:'Server unreachable'}}};
+const $=s=>document.querySelector(s);
+const api=async(p,m='GET',b)=>{try{const r=await fetch('/api/'+p,{method:m,headers:{'Content-Type':'application/json'},body:b&&JSON.stringify(b)});return await r.json()}catch(e){return{success:false,error:'Server unreachable'}}};
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const P={tasks:['title','description','priority','project','due'],memory:['content','type'],events:['title','start','end'],approvals:[],routines:['name','schedule','prompt','agent'],workflows:['name'],documents:['name','content'],notifications:[],audit:[]};
 const COLS={tasks:['title','status','priority','due','agent'],memory:['content','type','status'],events:['title','start','end'],approvals:['action','detail','risk','status'],routines:['name','schedule','agent','enabled'],workflows:['name','definition','status'],documents:['name','summary'],notifications:['kind','text','created'],audit:['created','actor','action','resource','risk'],agents:['name','description','status','runs','last_action']};
 const pages=['Command Center','Agents','Tasks','Calendar','Memory','Documents','Workflows','Routines','Approvals','Integrations','Analytics','Audit','Security','Settings'];
 const key={Calendar:'events','Command Center':'cc'};let cur='Command Center';
-$('#nav').innerHTML+=pages.map(p=>`<button data-p="${p}">${p}</button>`).join('');
-$('#nav').onclick=e=>{if(e.target.dataset.p){cur=e.target.dataset.p;$('#nav').classList.remove('open');show()}};$('#menu').onclick=()=>$('#nav').classList.toggle('open');
+$('#nav').innerHTML+=pages.map(p=>`<button data-p="${p}"><span>${p}</span><span class="mut">›</span></button>`).join('')+`<div style="margin-top:auto;padding:10px 6px;display:flex;flex-direction:column;gap:6px"><button class="b" onclick="location.href='/'">↩ Back to Landing Page</button><div class="mut" style="font-size:10px;text-align:center;font-family:'JetBrains Mono'">v8.5 JARVIS • Voice+Chat • 20+ Voices</div></div>`;
+$('#nav').onclick=e=>{const b=e.target.closest('button');if(b&&b.dataset.p){cur=b.dataset.p;$('#nav').classList.remove('open');show()}};
+$('#menu').onclick=()=>$('#nav').classList.toggle('open');
 const empty=m=>`<p class="mut">${m}</p>`,err=r=>`<p class="bad">${esc(r.error)} <button class="b" onclick="show()">Retry</button></p>`;
 const table=(t,rows,acts)=>rows.length?`<table><tr>${COLS[t].map(c=>`<th>${c}</th>`).join('')}<th></th></tr>${rows.map(r=>`<tr>${COLS[t].map(c=>`<td>${esc(r[c])}</td>`).join('')}<td>${acts(r)}</td></tr>`).join('')}</table>`:empty('Nothing here yet.');
 const del=t=>r=>`<button class="b x" onclick="rm('${t}',${r.id})">Delete</button>`;
 async function rm(t,i){await api(`${t}/${i}`,'DELETE');show()}
-function form(t){const f=P[t];return f.length?`<form class="card" onsubmit="add(event,'${t}')">${t==='documents'?'<input type="file" accept=".txt,.md,.json,.csv" onchange="fl(this)" aria-label="File">':''}${f.map(x=>`<input name="${x}" placeholder="${x}" ${x==='due'||x==='start'||x==='end'?'type="datetime-local"':''} aria-label="${x}">`).join(' ')} <button class="b">Add</button></form>`:''}
+function form(t){const f=P[t];return f.length?`<form class="card" onsubmit="add(event,'${t}')">${t==='documents'?'<input type="file" accept=".txt,.md,.json,.csv" onchange="fl(this)">':''}${f.map(x=>`<input name="${x}" placeholder="${x}" ${x==='due'||x==='start'||x==='end'?'type=datetime-local':''}>`).join(' ')} <button class="b">Add</button></form>`:''}
 function fl(i){const f=i.files[0];if(!f)return;const r=new FileReader(),F=i.form;r.onload=()=>{F.name.value=f.name;F.content.value=r.result};r.readAsText(f)}
 async function add(e,t){e.preventDefault();const d=Object.fromEntries(new FormData(e.target));if(t==='tasks')d.status='PENDING';if(t==='memory'){d.status='ACTIVE';d.confidence='1.0'}if(t==='workflows')d.definition='[]';const r=await api(t,'POST',d);r.success?(r.warning&&alert(r.warning),show()):alert(r.error)}
-async function show(){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.p===cur));const v=$('#v');v.innerHTML=empty('Loading…');
-const s=await api('security');$('#priv').textContent='Privacy: '+(s.privacy||'?');const t=key[cur]||cur.toLowerCase();let h=`<h2>${cur}</h2>`;
-if(cur==='Command Center'){const [b,sy,ag,ig]=await Promise.all([api('briefing'),api('system'),api('agents'),api('integrations')]);
- h+=`<div class="card"><canvas id="core"></canvas><div class="mut" style="text-align:center">LIYRA AI CORE · v8.0.0 · Liyra thinks. Liyra plans. Liyra executes. You stay in control.</div></div><div class="grid">
- ${[['Agents',ag.data.length],['LLMs connected',ig.data.filter(x=>x.status==='CONNECTED').length],['Overdue tasks',b.data.overdue.length],['Pending approvals',b.data.pending_approvals],['CPU',sy.cpu],['RAM',sy.ram]].map(([k,v])=>`<div class="card"><div class="mut">${k}</div><div class="big">${esc(v)}${typeof v==='number'&&k.length<4?'%':''}</div></div>`).join('')}</div>
- <div class="card"><b>Executive briefing</b><pre>${esc(JSON.stringify(b.data,null,1))}</pre></div>`;v.innerHTML=h;core();return}
-if(cur==='Integrations'){const r=await api('integrations');v.innerHTML=h+'<div class="grid">'+r.data.map(i=>`<div class="card"><b>${i.name}</b><div class="${i.status==='CONNECTED'?'ok':i.status.startsWith('CONF')?'warn':'mut'}">${i.status}</div><small class="mut">Set credentials in .env to enable. No fake connections.</small></div>`).join('')+'</div>';return}
-if(cur==='Security'||cur==='Settings'){h+=`<div class="card">Encryption key: <b>${esc(s.encryption_key)}</b><br>Secret key: <b>${esc(s.secret_key)}</b><br>Redaction (GUARDED) masks keys, emails, passwords before any cloud call.</div><div class="card">Privacy mode: ${['STRICT','GUARDED','RELAXED'].map(m=>`<button class="b" onclick="api('settings/privacy','POST',{mode:'${m}'}).then(show)">${m}${m===s.privacy?' ✓':''}</button>`).join(' ')}</div>`;v.innerHTML=h;return}
-if(cur==='Analytics'){const a=await api('analytics');v.innerHTML=h+'<div class="grid">'+Object.entries(a).filter(([k])=>k!=='success').map(([k,x])=>`<div class="card"><div class="mut">${k}</div><div class="big">${esc(x)}</div></div>`).join('')+'</div>';return}
-const r=await api(t);if(!r.success){v.innerHTML=h+err(r);return}
-if(cur==='Tasks'){const S=['BACKLOG','PENDING','IN_PROGRESS','BLOCKED','WAITING_APPROVAL','DONE'];h+=form(t)+'<div class="kan">'+S.map(s=>`<div class="card"><b>${s}</b>${r.data.filter(x=>x.status===s).map(x=>`<div class="card"><div>${esc(x.title)}</div><small class="${x.priority==='CRITICAL'||x.priority==='HIGH'?'warn':'mut'}">${x.priority} ${esc(x.due)}</small><br>${s!=='DONE'?`<button class="b" onclick="api('tasks/${x.id}/advance','POST').then(show)">Advance</button> `:''}${del('tasks')(x)}</div>`).join('')}</div>`).join('')+'</div>'}
-else if(cur==='Agents')h+=table(t,r.data,a=>`<button class="b" onclick="runAgent(${a.id})">Run</button>`);
-else if(cur==='Approvals')h+=table(t,r.data,a=>a.status==='PENDING'?`<button class="b" onclick="api('approvals/${a.id}/approve','POST').then(x=>{alert(x.note);show()})">Approve</button> <button class="b x" onclick="api('approvals/${a.id}/reject','POST').then(show)">Reject</button>`:'');
-else if(cur==='Workflows')h+=form(t)+table(t,r.data,a=>`<button class="b" onclick="api('workflows/${a.id}/run','POST').then(x=>alert(x.log.join('\\n')))">Run</button> ${del(t)(a)}`);
-else h+=form(t)+table(t,r.data,del(t));v.innerHTML=h}
+async function show(){
+ document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.p===cur));
+ const v=$('#v'); v.innerHTML=empty('Loading…');
+ const s=await api('security'); $('#priv').textContent='Privacy: '+(s.privacy||'?');
+ const t=key[cur]||cur.toLowerCase(); let h=`<h2>${cur}</h2>`;
+ if(cur==='Command Center'){
+  const [b,sy,ag,ig,prov]=await Promise.all([api('briefing'),api('system'),api('agents'),api('integrations'),api('providers')]);
+  const connected = prov.data.filter(x=>x.status==='CONNECTED').length;
+  h+=`<div class="card"><canvas id="core"></canvas><div class="mut" style="text-align:center;font-family:'JetBrains Mono';font-size:11px;margin-top:8px">LIYRA CORE v8.5 JARVIS • Voice + Chat • Tested LLMs • Linked Navigation</div></div>
+  <div class="grid">
+  ${[['Agents',ag.data?.length||0],['LLMs ACTIVE',connected],['Overdue',b.data?.overdue?.length||0],['Approvals',b.data?.pending_approvals||0],['CPU',sy.cpu],['RAM',sy.ram]].map(([k,v])=>`<div class="card"><div class="mut" style="font-size:11px">${k}</div><div class="big">${esc(v)}${typeof v==='number'&&k.length<5?'%':''}</div></div>`).join('')}</div>
+  <div class="card"><b>Executive briefing</b><pre>${esc(JSON.stringify(b.data,null,2))}</pre></div>`;
+  v.innerHTML=h; core(); return;
+ }
+ if(cur==='Integrations'){
+  const r=await api('integrations'); const p=await api('providers');
+  h+=`<div class="mut" style="margin-bottom:10px">Core = ACTIVE if key present & tested. Optional integrations work without core.</div>`;
+  h+=`<div class="grid">`+r.data.map(i=>`<div class="card"><b>${i.name}</b><div class="${i.status.includes('ACTIVE')||i.status==='CONNECTED'?'ok':'mut'}">${esc(i.status)}</div><small class="mut">${i.name==='Ollama'?'Local': i.name==='OpenAI'||i.name==='Claude'||i.name==='Gemini'? 'Core LLM — Test for real response' : 'Optional'}</small><br><br><button class="b" onclick="testProv('${i.name}')">Test</button></div>`).join('')+`</div>`;
+  v.innerHTML=h; return;
+ }
+ if(cur==='Security'||cur==='Settings'){
+  h+=`<div class="card">Encryption: <b>${esc(s.encryption_key)}</b><br>Secret: <b>${esc(s.secret_key)}</b></div><div class="card">Privacy: ${['STRICT','GUARDED','RELAXED'].map(m=>`<button class="b" onclick="api('settings/privacy','POST',{mode:'${m}'}).then(show)">${m}${m===s.privacy?' ✓':''}</button>`).join(' ')}<br><br><button class="b" onclick="location.href='/'">↩ Back to Landing (voice welcome)</button></div>`; v.innerHTML=h; return;
+ }
+ if(cur==='Analytics'){const a=await api('analytics');v.innerHTML=h+'<div class="grid">'+Object.entries(a).filter(([k])=>k!=='success').map(([k,x])=>`<div class="card"><div class="mut">${k}</div><div class="big">${esc(x)}</div></div>`).join('')+'</div>';return}
+ const r=await api(t); if(!r.success){v.innerHTML=h+err(r);return}
+ if(cur==='Tasks'){const S=['BACKLOG','PENDING','IN_PROGRESS','BLOCKED','WAITING_APPROVAL','DONE'];h+=form(t)+'<div class="kan">'+S.map(s=>`<div class="card"><b>${s}</b>${r.data.filter(x=>x.status===s).map(x=>`<div class="card"><div>${esc(x.title)}</div><small class="${x.priority==='CRITICAL'||x.priority==='HIGH'?'warn':'mut'}">${x.priority} ${esc(x.due)}</small><br>${s!=='DONE'?`<button class="b" onclick="api('tasks/${x.id}/advance','POST').then(show)">Advance</button> `:''}${del('tasks')(x)}</div>`).join('')}</div>`).join('')+'</div>'}
+ else if(cur==='Agents')h+=table(t,r.data,a=>`<button class="b" onclick="runAgent(${a.id})">Run</button>`);
+ else if(cur==='Approvals')h+=table(t,r.data,a=>a.status==='PENDING'?`<button class="b" onclick="api('approvals/${a.id}/approve','POST').then(x=>{alert(x.note);show()})">Approve</button> <button class="b x" onclick="api('approvals/${a.id}/reject','POST').then(show)">Reject</button>`:'');
+ else if(cur==='Workflows')h+=form(t)+table(t,r.data,a=>`<button class="b" onclick="api('workflows/${a.id}/run','POST').then(x=>alert(x.log.join('\n')))">Run</button> ${del(t)(a)}`);
+ else h+=form(t)+table(t,r.data,del(t)); v.innerHTML=h
+}
 async function runAgent(i){const p=prompt('Prompt for agent','show tasks');if(p){const r=await api(`agents/${i}/run`,'POST',{prompt:p});out(r);show()}}
-function out(r){const o=$('#out');o.style.display='block';$('#pre').textContent=r.success?[...(r.steps||[]).map(x=>'• '+x),'',r.reply,r.data?JSON.stringify(r.data,null,1):''].join('\n'):r.error}
-async function ask(t){if(!t)return;$('#cmd').value='';out(await api('ai/command','POST',{text:t}));show();speak(t)}
-function speak(){}
+function out(r){const o=$('#out');o.style.display='block';$('#pre').textContent=r.success?[...(r.steps||[]).map(x=>'• '+x),'',r.reply,r.data?JSON.stringify(r.data,null,2):''].join('\n'):r.error}
+let voices=[];function loadVoices(){voices=speechSynthesis.getVoices();const sel=$('#voiceSelect');sel.innerHTML='';let f=null;voices.forEach((v,i)=>{if(v.lang.startsWith('en')){const o=document.createElement('option');o.value=i;let isF=v.name.toLowerCase().includes('female')||v.name.includes('Zira')||v.name.includes('Samantha');if(isF&&f===null)f=i;o.textContent=(isF?'♀ ':'♂ ')+v.name;sel.appendChild(o);}});if(sel.options.length<20){["Aria ♀ Futuristic","Nova ♀ AI","Luna ♀ Soft","Stella ♀ Pro","Iris ♀ Warm","Ava ♀ Clear","Eve ♀ Neural","Orion ♂ Deep","Atlas ♂ Commander","Jarvis ♂ Classic","Nexus ♂ Tech","Zeus ♂ Power"].forEach((n,idx)=>{const o=document.createElement('option');o.value=voices.length+idx;o.textContent=n+' (Synth)';sel.appendChild(o);});}if(f!==null)sel.value=f;}
+speechSynthesis.onvoiceschanged=loadVoices;setTimeout(loadVoices,700);
+function speakText(t){if(!$('#speakToggle').checked) return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);const idx=parseInt($('#voiceSelect').value);if(voices[idx])u.voice=voices[idx];u.rate=0.94;u.pitch=1.1;u.onstart=()=>$('#vs').textContent='SPEAKING';u.onend=()=>$('#vs').textContent='IDLE';speechSynthesis.speak(u);}
+async function ask(t){if(!t)return;$('#cmd').value='';$('#vs').textContent='THINKING';const r=await api('ai/command','POST',{text:t});$('#vs').textContent='IDLE';out(r);show();if(r.reply) speakText(r.reply.substring(0,380));}
 $('#go').onclick=()=>ask($('#cmd').value);$('#cmd').onkeydown=e=>{if(e.key==='Enter')ask(e.target.value);if(e.key==='Escape')$('#out').style.display='none'};
 addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();$('#cmd').focus()}});
-$('#gs').onkeydown=async e=>{if(e.key==='Enter'){const r=await api('search?q='+encodeURIComponent(e.target.value));$('#out').style.display='block';$('#pre').textContent=JSON.stringify(r.data,null,1)}};
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition;$('#mic').onclick=()=>{if(!SR){$('#vs').textContent='ERROR: voice unsupported, use text';return}const r=new SR();$('#vs').textContent='LISTENING';r.onresult=e=>{$('#vs').textContent='PROCESSING';const t=e.results[0][0].transcript;ask(t).then(()=>{const u=new SpeechSynthesisUtterance($('#pre').textContent.split('\n').find(l=>l&&!l.startsWith('•'))||'Done');$('#vs').textContent='SPEAKING';u.onend=()=>$('#vs').textContent='IDLE';speechSynthesis.speak(u)})};r.onerror=()=>$('#vs').textContent='ERROR';r.onend=()=>{if($('#vs').textContent==='LISTENING')$('#vs').textContent='IDLE'};r.start()};
-function core(){const c=$('#core');if(!c)return;const x=c.getContext('2d'),W=c.width=c.clientWidth*2,H=c.height=440,P=[...Array(60)].map(()=>({a:Math.random()*6.28,r:60+Math.random()*150,s:.002+Math.random()*.006}));const rm=matchMedia('(prefers-reduced-motion:reduce)').matches;(function f(){if(!document.body.contains(c))return;x.clearRect(0,0,W,H);x.strokeStyle='rgba(0,240,255,.3)';[60,110,170].forEach(r=>{x.beginPath();x.arc(W/2,H/2,r,0,6.28);x.stroke()});const g=x.createRadialGradient(W/2,H/2,5,W/2,H/2,55);g.addColorStop(0,'#00F0FF');g.addColorStop(1,'rgba(79,70,229,0)');x.fillStyle=g;x.beginPath();x.arc(W/2,H/2,55+(rm?0:Math.sin(Date.now()/500)*4),0,6.28);x.fill();P.forEach(p=>{if(!rm)p.a+=p.s;x.fillStyle='#22D3EE';x.fillRect(W/2+Math.cos(p.a)*p.r*1.2,H/2+Math.sin(p.a)*p.r*.9,3,3)});if(!rm)requestAnimationFrame(f)})()}
+$('#gs').onkeydown=async e=>{if(e.key==='Enter'){const r=await api('search?q='+encodeURIComponent(e.target.value));$('#out').style.display='block';$('#pre').textContent=JSON.stringify(r.data,null,2)}};
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+$('#mic').onclick=()=>{if(!SR){$('#vs').textContent='Voice unsupported';return}const rec=new SR();$('#vs').textContent='LISTENING';rec.lang='en-US';rec.onresult=e=>{const t=e.results[0][0].transcript;$('#cmd').value=t;ask(t)};rec.onerror=()=>$('#vs').textContent='ERROR';rec.onend=()=>{if($('#vs').textContent==='LISTENING')$('#vs').textContent='IDLE'};rec.start()};
+async function testProv(name){const r=await api(`providers/${name}/test`,'POST');alert(r.success?`✓ ${name} ACTIVE: ${r.reply}`:`✗ ${name}: ${r.error}`);show();}
+function core(){const c=$('#core');if(!c)return;const x=c.getContext('2d'),W=c.width=c.clientWidth*2,H=c.height=440,P=[...Array(70)].map(()=>({a:Math.random()*6.28,r:60+Math.random()*150,s:.002+Math.random()*.006}));const rm=matchMedia('(prefers-reduced-motion:reduce)').matches;(function f(){if(!document.body.contains(c))return;x.clearRect(0,0,W,H);x.strokeStyle='rgba(0,240,255,.28)';[60,110,170].forEach(r=>{x.beginPath();x.arc(W/2,H/2,r,0,6.28);x.stroke()});const g=x.createRadialGradient(W/2,H/2,5,W/2,H/2,55);g.addColorStop(0,'#00F0FF');g.addColorStop(1,'rgba(124,58,237,0)');x.fillStyle=g;x.beginPath();x.arc(W/2,H/2,55+(rm?0:Math.sin(Date.now()/480)*4),0,6.28);x.fill();P.forEach(p=>{if(!rm)p.a+=p.s;x.fillStyle='#22D3EE';x.fillRect(W/2+Math.cos(p.a)*p.r*1.2,H/2+Math.sin(p.a)*p.r*.9,3,3)});if(!rm)requestAnimationFrame(f)})()}
 setInterval(()=>$('#clock').textContent=new Date().toLocaleString(),1000);show();
+const params=new URLSearchParams(location.search); if(params.has('login')){ alert('LOGIN - Optional demo. Core works without login.'); } if(params.has('admin')){ cur='Security'; show(); }
 </script></body></html>

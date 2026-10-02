@@ -1,11 +1,14 @@
 import os, re, json, sqlite3, datetime as dt, urllib.request
-from flask import Flask, request, jsonify, g
+from flask import Flask, request, jsonify, g, send_from_directory
+
 BASE = os.path.dirname(os.path.abspath(__file__))
 IS_VERCEL = os.environ.get("VERCEL") == "1"
 DB = "/tmp/liyra.db" if IS_VERCEL else os.path.join(BASE, "liyra.db")
 OLLAMA = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+
 app = Flask(__name__, static_folder=os.path.join(BASE, "static"), static_url_path="/static")
 app.secret_key = os.environ.get("SECRET_KEY", "dev-only")
+
 T = {"tasks": "title,description,status,priority,project,due,agent", "memory": "content,type,confidence,status",
      "events": "title,start,end", "approvals": "action,detail,risk,status", "routines": "name,schedule,prompt,agent,enabled",
      "workflows": "name,definition,status", "notifications": "kind,text", "audit": "actor,action,resource,status,risk",
@@ -13,18 +16,21 @@ T = {"tasks": "title,description,status,priority,project,due,agent", "memory": "
 STATUS = ["BACKLOG", "PENDING", "IN_PROGRESS", "BLOCKED", "WAITING_APPROVAL", "DONE"]
 INTEG = ["OpenAI", "Claude", "Gemini", "Gmail", "Google Calendar", "GitHub", "Jira", "Slack", "Notion", "Discord", "Trello","Linear", "Outlook", "Google Drive", "Dropbox", "Webhooks"]
 ENVKEY = {"OpenAI": "OPENAI_API_KEY", "Claude": "ANTHROPIC_API_KEY", "Gemini": "GOOGLE_AI_API_KEY","Google Calendar": "GOOGLE_CLIENT_ID", "Gmail": "GOOGLE_CLIENT_ID", "GitHub": "GITHUB_CLIENT_ID"}
+
 def db():
     if "db" not in g:
         os.makedirs(os.path.dirname(DB), exist_ok=True)
         g.db = sqlite3.connect(DB, check_same_thread=False)
         g.db.row_factory = sqlite3.Row
     return g.db
+
 @app.teardown_appcontext
 def close(_):
     d = g.pop("db", None)
     if d:
         try: d.close()
         except: pass
+
 def q(sql, a=(), one=False):
     try:
         c = db().execute(sql, a); db().commit(); r = c.fetchall()
@@ -34,7 +40,9 @@ def q(sql, a=(), one=False):
             init(); c = db().execute(sql, a); db().commit(); r = c.fetchall()
             return (dict(r[0]) if r else None) if one else [dict(x) for x in r]
         raise
+
 def now(): return dt.datetime.now().isoformat(timespec="seconds")
+
 def init():
     try:
         os.makedirs(os.path.dirname(DB), exist_ok=True)
@@ -48,6 +56,7 @@ def init():
                 c.execute("INSERT INTO agents(name,description,status,tools,runs,last_action,created) VALUES(?,?,?,?,0,'-',?)", (n + " Agent", d, "IDLE", "local", now()))
         c.commit(); c.close()
     except Exception as e: print(f"INIT ERROR {e}")
+
 def audit(actor, action, res="", status="OK", risk="LOW"):
     try: q("INSERT INTO audit(actor,action,resource,status,risk,created) VALUES(?,?,?,?,?,?)", (actor, action, res, status, risk, now()))
     except: pass
@@ -101,37 +110,59 @@ def route(text):
     except Exception:
         return {"reply": "No LLM connected (OLLAMA OFFLINE). Built-in commands still work.", "steps": steps}
 
+# --- FIXED ROOT ROUTE ---
 @app.get("/")
 def index():
-    try: return app.send_static_file("index.html")
-    except: return jsonify(success=True, message="LIYRA AI is running on Vercel", briefing=briefing())
+    index_path = os.path.join(BASE, "static", "index.html")
+    if os.path.exists(index_path):
+        return send_from_directory(os.path.join(BASE, "static"), "index.html")
+    return """<!DOCTYPE html><html><head><title>LIYRA AI LIVE</title><meta name=viewport content="width=device-width,initial-scale=1">
+    <style>body{font-family:system-ui;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+   .b{border:1px solid #222;padding:32px;border-radius:20px;background:#111;max-width:600px} a{color:#6cf}</style></head>
+    <body><div class=b><h1>🚀 LIYRA AI is LIVE on Vercel!</h1>
+    <p>Backend OK. API: <a href=/api/briefing>/api/briefing</a> | <a href=/api/tasks>/api/tasks</a></p>
+    <pre id=x>Loading briefing...</pre><script>fetch('/api/briefing').then(r=>r.json()).then(j=>document.getElementById('x').innerText=JSON.stringify(j.data,null,2))</script>
+    </div></body></html>"""
+
+@app.errorhandler(404)
+def not_found(e):
+    return jsonify(success=False, error=f"Route {request.path} not found. Try /api/briefing"), 404
 
 @app.errorhandler(Exception)
 def err(e):
-    app.logger.exception(e); return jsonify(success=False, error=str(e)[:200]), getattr(e, "code", 500)
+    if getattr(e, 'code', 500) == 404:
+        return jsonify(success=False, error=f"{request.path} not found"), 404
+    app.logger.exception(e)
+    return jsonify(success=False, error=str(e)[:200]), getattr(e, "code", 500)
+
+# --- ALL YOUR API ROUTES (same) ---
 @app.post("/api/ai/command")
 def command():
     t = (request.json or {}).get("text", "").strip()
     if not t: return jsonify(success=False, error="Empty command"), 400
     audit("user", "command", t[:80]); return jsonify(success=True, **route(t))
+
 @app.post("/api/agents/<int:i>/run")
 def run_agent(i):
     a = q("SELECT * FROM agents WHERE id=?", (i,), one=True)
     if not a: return jsonify(success=False, error="Agent not found"), 404
     p = (request.json or {}).get("prompt", "show tasks")
     r = route(p); q("UPDATE agents SET runs=runs+1,status='SUCCESS',last_action=? WHERE id=?", (p[:60], i)); audit(a["name"], "run", p[:60]); return jsonify(success=True, **r)
+
 @app.post("/api/tasks/<int:i>/advance")
 def advance(i):
     t = q("SELECT status FROM tasks WHERE id=?", (i,), one=True)
     if not t: return jsonify(success=False, error="Task not found"), 404
     n = STATUS[min(STATUS.index(t["status"]) + 1, 5)] if t["status"] in STATUS else "DONE"
     q("UPDATE tasks SET status=? WHERE id=?", (n, i)); audit("user", "advance_task", str(i)); return jsonify(success=True, status=n)
+
 @app.post("/api/approvals/<int:i>/<d>")
 def decide(i, d):
     s = {"approve": "APPROVED", "reject": "REJECTED"}.get(d)
     if not s: return jsonify(success=False, error="Bad decision"), 400
     q("UPDATE approvals SET status=? WHERE id=?", (s, i)); audit("user", d, f"approval {i}", "OK", "HIGH")
     return jsonify(success=True, status=s)
+
 @app.post("/api/workflows/<int:i>/run")
 def run_wf(i):
     w = q("SELECT * FROM workflows WHERE id=?", (i,), one=True)
@@ -142,24 +173,29 @@ def run_wf(i):
             q("INSERT INTO approvals(action,detail,risk,status,created) VALUES(?,?,?,?,?)", (f"workflow:{w['name']}", n, "HIGH", "PENDING", now())); log.append(n + " -> waiting approval"); break
         log.append(n + " -> done")
     audit("workflow", "run", w["name"]); return jsonify(success=True, log=log)
+
 @app.get("/api/integrations")
 def integ():
     ol = "OFFLINE"
     try: ollama("/api/tags"); ol = "CONNECTED"
     except: pass
     return jsonify(success=True, data=[{"name": n, "status": ol if n == "Ollama" else ("CONFIGURED" if os.environ.get(ENVKEY.get(n, "_")) else "NOT CONNECTED")} for n in ["Ollama"] + INTEG])
+
 @app.get("/api/security")
 def sec(): return jsonify(success=True, privacy=privacy())
+
 @app.post("/api/settings/privacy")
 def setpriv():
     m = (request.json or {}).get("mode", "")
     if m not in ("STRICT", "GUARDED", "RELAXED"): return jsonify(success=False, error="Invalid mode"), 400
     q("UPDATE settings SET v=? WHERE k='privacy'", (m,)); return jsonify(success=True, mode=m)
+
 @app.get("/api/system")
 def system():
     try:
         import psutil; return jsonify(success=True, cpu=psutil.cpu_percent(), ram=psutil.virtual_memory().percent, disk=psutil.disk_usage("/").percent)
     except ImportError: return jsonify(success=True, cpu="UNAVAILABLE", ram="UNAVAILABLE", disk="UNAVAILABLE")
+
 @app.get("/api/search")
 def search():
     k = f"%{request.args.get('q', '')}%"

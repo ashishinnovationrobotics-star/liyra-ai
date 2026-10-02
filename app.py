@@ -24,6 +24,11 @@ def db():
         g.db.row_factory = sqlite3.Row
     return g.db
 
+@app.before_request
+def ensure_db():
+    if not os.path.exists(DB):
+        init()
+
 @app.teardown_appcontext
 def close(_):
     d = g.pop("db", None)
@@ -37,7 +42,8 @@ def q(sql, a=(), one=False):
         return (dict(r[0]) if r else None) if one else [dict(x) for x in r]
     except Exception as e:
         if "no such table" in str(e).lower():
-            init(); c = db().execute(sql, a); db().commit(); r = c.fetchall()
+            init()
+            c = db().execute(sql, a); db().commit(); r = c.fetchall()
             return (dict(r[0]) if r else None) if one else [dict(x) for x in r]
         raise
 
@@ -55,30 +61,39 @@ def init():
             for n, d in [("Coding", "Reads/proposes code"), ("Research", "Searches memory & documents"), ("Memory", "Stores/forgets facts"),("Browser", "Adapter: not configured"), ("Task", "Creates and tracks tasks"), ("System", "Monitors health"),("Planner", "Breaks goals into tasks"), ("Executive", "Builds briefings")]:
                 c.execute("INSERT INTO agents(name,description,status,tools,runs,last_action,created) VALUES(?,?,?,?,0,'-',?)", (n + " Agent", d, "IDLE", "local", now()))
         c.commit(); c.close()
-    except Exception as e: print(f"INIT ERROR {e}")
+    except Exception as e:
+        print(f"INIT ERROR {e}")
 
 def audit(actor, action, res="", status="OK", risk="LOW"):
     try: q("INSERT INTO audit(actor,action,resource,status,risk,created) VALUES(?,?,?,?,?,?)", (actor, action, res, status, risk, now()))
     except: pass
+
 def privacy():
     try: return q("SELECT v FROM settings WHERE k='privacy'", one=True)["v"]
     except: return "GUARDED"
+
 def redact(s):
     for p, r in [(r"sk-[A-Za-z0-9_\-]{16,}", "[KEY]"), (r"[\w.+-]+@[\w-]+\.[\w.]+", "[EMAIL]"), (r"(?i)(password|token|secret)\s*[:=]\s*\S+", r"\1=[REDACTED]")]:
         s = re.sub(p, r, s)
     return s
+
 def ollama(path, data=None):
     req = urllib.request.Request(OLLAMA + path, json.dumps(data).encode() if data else None, {"Content-Type": "application/json"})
     return json.load(urllib.request.urlopen(req, timeout=2))
+
 def overdue():
     try: return q("SELECT * FROM tasks WHERE due!='' AND due<? AND status NOT IN('DONE','CANCELLED')", (dt.date.today().isoformat(),))
     except: return []
+
 def briefing():
     try:
         t = q("SELECT title,priority,due FROM tasks WHERE status NOT IN('DONE','CANCELLED') ORDER BY priority DESC LIMIT 5")
         ev = q("SELECT title,start FROM events WHERE start>=? ORDER BY start LIMIT 5", (dt.date.today().isoformat(),))
         return {"priorities": t, "meetings": ev, "overdue": [x["title"] for x in overdue()], "pending_approvals": len(q("SELECT 1 FROM approvals WHERE status='PENDING'")),"active_agents": len(q("SELECT 1 FROM agents WHERE status!='IDLE'")), "privacy": privacy()}
-    except: return {"priorities": [], "meetings": [], "overdue": [], "pending_approvals": 0, "active_agents": 0, "privacy": "GUARDED"}
+    except Exception as e:
+        print(f"briefing error {e}")
+        return {"priorities": [], "meetings": [], "overdue": [], "pending_approvals": 0, "active_agents": 0, "privacy": "GUARDED"}
+
 def route(text):
     s = text.strip(); l = s.lower(); steps = ["Understanding request"]
     m = re.match(r"create (?:an? )?(?:(low|medium|high|critical)[- ]priority )?task (?:to )?(.+?)(?: (tomorrow|today))?\.?$", l)
@@ -110,19 +125,12 @@ def route(text):
     except Exception:
         return {"reply": "No LLM connected (OLLAMA OFFLINE). Built-in commands still work.", "steps": steps}
 
-# --- FIXED ROOT ROUTE ---
 @app.get("/")
 def index():
     index_path = os.path.join(BASE, "static", "index.html")
     if os.path.exists(index_path):
         return send_from_directory(os.path.join(BASE, "static"), "index.html")
-    return """<!DOCTYPE html><html><head><title>LIYRA AI LIVE</title><meta name=viewport content="width=device-width,initial-scale=1">
-    <style>body{font-family:system-ui;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
-   .b{border:1px solid #222;padding:32px;border-radius:20px;background:#111;max-width:600px} a{color:#6cf}</style></head>
-    <body><div class=b><h1>🚀 LIYRA AI is LIVE on Vercel!</h1>
-    <p>Backend OK. API: <a href=/api/briefing>/api/briefing</a> | <a href=/api/tasks>/api/tasks</a></p>
-    <pre id=x>Loading briefing...</pre><script>fetch('/api/briefing').then(r=>r.json()).then(j=>document.getElementById('x').innerText=JSON.stringify(j.data,null,2))</script>
-    </div></body></html>"""
+    return """<!DOCTYPE html><html><head><title>LIYRA AI LIVE</title></head><body><h1>LIYRA LIVE</h1><a href=/api/briefing>/api/briefing</a></body></html>"""
 
 @app.errorhandler(404)
 def not_found(e):
@@ -135,7 +143,6 @@ def err(e):
     app.logger.exception(e)
     return jsonify(success=False, error=str(e)[:200]), getattr(e, "code", 500)
 
-# --- ALL YOUR API ROUTES (same) ---
 @app.post("/api/ai/command")
 def command():
     t = (request.json or {}).get("text", "").strip()
@@ -183,7 +190,6 @@ def integ():
 
 @app.get("/api/security")
 def sec(): return jsonify(success=True, privacy=privacy())
-
 @app.post("/api/settings/privacy")
 def setpriv():
     m = (request.json or {}).get("mode", "")

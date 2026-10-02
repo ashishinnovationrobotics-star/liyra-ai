@@ -21,4 +21,12 @@ class T(unittest.TestCase):
         r = self.cmd("Find a free 90 minute slot tomorrow"); self.assertTrue(r["success"] and r["data"])
         e = self.c.get("/api/events").get_json()["data"][0]
         w = self.c.post("/api/events", json={"title": "x", "start": e["start"], "end": e["end"]}).get_json(); self.assertIn("Conflicts", w["warning"])
+    def test_llm_provider_and_strict(self):
+        os.environ["OPENAI_API_KEY"] = "sk-testtesttesttesttest"; seen = []
+        A.post = lambda u, b, h: seen.append(b) or {"choices": [{"message": {"content": "hello from llm"}}]}
+        self.c.post("/api/settings/privacy", json={"mode": "GUARDED"}); self.c.post("/api/providers/select", json={"provider": "OpenAI"})
+        r = self.cmd("what is robotics? mail me at a@b.com"); self.assertEqual(r["reply"], "hello from llm"); self.assertNotIn("a@b.com", str(seen))
+        self.c.post("/api/settings/privacy", json={"mode": "STRICT"}); self.assertIn("No LLM", self.cmd("what is robotics")["reply"])
+        self.assertTrue(self.c.post("/api/providers/Claude/test").get_json()["error"].startswith("Claude is not configured"))
+        self.assertIn("Liyra", self.c.get("/").get_data(as_text=True)); self.assertEqual(self.c.get("/app").status_code, 200)
 if __name__ == "__main__": unittest.main()

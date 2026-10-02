@@ -34,7 +34,7 @@ def init():
     for t, cols in T.items():
         c.execute(f"CREATE TABLE IF NOT EXISTS {t}(id INTEGER PRIMARY KEY, {','.join(x+' TEXT' for x in cols.split(','))}, created TEXT)")
     c.execute("CREATE TABLE IF NOT EXISTS settings(k TEXT PRIMARY KEY, v TEXT)")
-    c.execute("INSERT OR IGNORE INTO settings VALUES('privacy','GUARDED')")
+    c.execute("INSERT OR IGNORE INTO settings VALUES('privacy','GUARDED')"); c.execute("INSERT OR IGNORE INTO settings VALUES('provider','auto')")
     if not c.execute("SELECT 1 FROM agents").fetchone():
         for n, d in [("Coding", "Reads/proposes code"), ("Research", "Searches memory & documents"), ("Memory", "Stores/forgets facts"),
                      ("Browser", "Adapter: not configured"), ("Task", "Creates and tracks tasks"), ("System", "Monitors health"),
@@ -68,6 +68,40 @@ def briefing():
     return {"priorities": t, "meetings": ev, "overdue": [x["title"] for x in overdue()], "pending_approvals": len(q("SELECT 1 FROM approvals WHERE status='PENDING'")),
             "active_agents": len(q("SELECT 1 FROM agents WHERE status!='IDLE'")), "privacy": privacy()}
 
+PROV = {"Ollama": "", "OpenAI": "OPENAI_API_KEY", "Claude": "ANTHROPIC_API_KEY", "Gemini": "GOOGLE_AI_API_KEY", "OpenRouter": "OPENROUTER_API_KEY", "Custom": "CUSTOM_API_KEY"}
+def post(url, body, headers):
+    req = urllib.request.Request(url, json.dumps(body).encode(), {"Content-Type": "application/json", **headers})
+    return json.load(urllib.request.urlopen(req, timeout=9))
+def configured(p):
+    if p == "Ollama":
+        try: ollama("/api/tags"); return True
+        except Exception: return False
+    if p == "Custom": return bool(os.environ.get("CUSTOM_API_KEY") and os.environ.get("CUSTOM_BASE_URL"))
+    return bool(os.environ.get(PROV[p]))
+def llm(p, prompt):
+    e = os.environ.get
+    if p == "Ollama":
+        m = e("OLLAMA_MODEL") or ollama("/api/tags")["models"][0]["name"]
+        return ollama("/api/generate", {"model": m, "prompt": prompt, "stream": False})["response"]
+    if p == "Claude":
+        r = post("https://api.anthropic.com/v1/messages", {"model": e("ANTHROPIC_MODEL", "claude-sonnet-5-5"), "max_tokens": 800, "messages": [{"role": "user", "content": prompt}]}, {"x-api-key": e("ANTHROPIC_API_KEY"), "anthropic-version": "2023-06-01"})
+        return r["content"][0]["text"]
+    if p == "Gemini":
+        m = e("GEMINI_MODEL", "gemini-2.0-flash")
+        r = post(f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent", {"contents": [{"parts": [{"text": prompt}]}]}, {"x-goog-api-key": e("GOOGLE_AI_API_KEY")})
+        return r["candidates"][0]["content"]["parts"][0]["text"]
+    base, key, model = {"OpenAI": ("https://api.openai.com/v1", "OPENAI_API_KEY", e("OPENAI_MODEL", "gpt-4o-mini")), "OpenRouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", e("OPENROUTER_MODEL", "openai/gpt-4o-mini")), "Custom": (e("CUSTOM_BASE_URL", ""), "CUSTOM_API_KEY", e("CUSTOM_MODEL", "default"))}[p]
+    r = post(base.rstrip("/") + "/chat/completions", {"model": model, "messages": [{"role": "user", "content": prompt}]}, {"Authorization": "Bearer " + e(key, "")})
+    return r["choices"][0]["message"]["content"]
+def ask_llm(prompt):
+    sel = q("SELECT v FROM settings WHERE k='provider'", one=True)["v"]; mode = privacy()
+    for p in ([sel] if sel in PROV else list(PROV)):
+        if (mode == "STRICT" and p != "Ollama") or not configured(p): continue
+        try:
+            out = llm(p, prompt if (p == "Ollama" or mode == "RELAXED") else redact(prompt)); audit("liyra", "llm_call", p); return out, p
+        except Exception as ex:
+            app.logger.warning("llm %s failed: %s", p, ex); audit("liyra", "llm_call", p, "FAILED", "MEDIUM")
+    return None, None
 def free_slots(day, mins):
     evs = sorted((e["start"], e["end"]) for e in q("SELECT start,\"end\" AS end FROM events WHERE start LIKE ?", (day + "%",)) if e["start"] and e["end"])
     cur = dt.datetime.fromisoformat(day + "T09:00"); end = dt.datetime.fromisoformat(day + "T18:00"); out = []
@@ -108,14 +142,14 @@ def route(text):
     if re.match(r"(send|email)", l):
         q("INSERT INTO approvals(action,detail,risk,status,created) VALUES('send_email',?, 'HIGH','PENDING',?)", (redact(s), now()))
         return {"reply": "Gmail is NOT CONNECTED. Queued for approval; nothing was sent.", "steps": steps + ["Waiting for approval"]}
-    try:
-        mods = ollama("/api/tags")["models"]; out = ollama("/api/generate", {"model": mods[0]["name"], "prompt": s, "stream": False})
-        return {"reply": out["response"], "steps": steps + ["Local model (Ollama)"]}
-    except Exception:
-        return {"reply": "No LLM connected (OLLAMA OFFLINE). Built-in commands still work.", "steps": steps}
+    out, p = ask_llm(s)
+    if out: return {"reply": out, "steps": steps + [f"Answered by {p}"]}
+    return {"reply": "No LLM available (STRICT mode allows only local Ollama). Connect a provider in Integrations. Built-in commands still work.", "steps": steps}
 
 @app.get("/")
-def index(): return app.send_static_file("index.html")
+def landing(): return app.send_static_file("landing.html")
+@app.get("/app")
+def console(): return app.send_static_file("index.html")
 @app.get("/api/health")
 def health(): return jsonify(success=True, db=DB, serverless=bool(os.environ.get("VERCEL")))
 @app.errorhandler(Exception)
@@ -148,6 +182,21 @@ def run_wf(i):
             q("INSERT INTO approvals(action,detail,risk,status,created) VALUES(?,?,?,?,?)", (f"workflow:{w['name']}", n, "HIGH", "PENDING", now())); log.append(n + " -> waiting approval"); break
         log.append(n + " -> done")
     audit("workflow", "run", w["name"]); return jsonify(success=True, log=log)
+@app.get("/api/providers")
+def providers():
+    return jsonify(success=True, selected=q("SELECT v FROM settings WHERE k='provider'", one=True)["v"], mode=privacy(), data=[{"name": p, "status": "CONFIGURED" if configured(p) else ("OFFLINE" if p == "Ollama" else "NOT CONNECTED")} for p in PROV])
+@app.post("/api/providers/select")
+def psel():
+    p = (request.json or {}).get("provider", "")
+    if p not in PROV and p != "auto": return jsonify(success=False, error="Unknown provider"), 400
+    q("UPDATE settings SET v=? WHERE k='provider'", (p,)); audit("user", "select_provider", p); return jsonify(success=True)
+@app.post("/api/providers/<p>/test")
+def ptest(p):
+    if p not in PROV: return jsonify(success=False, error="Unknown provider"), 404
+    if not configured(p): return jsonify(success=False, error=f"{p} is not configured. Set {PROV[p] or 'OLLAMA_BASE_URL (and run Ollama)'} in .env or Vercel Environment Variables.")
+    try: return jsonify(success=True, reply=llm(p, "Reply with the single word OK.")[:80])
+    except Exception as ex:
+        app.logger.warning("test %s: %s", p, ex); return jsonify(success=False, error=f"{p} call failed: {str(ex)[:140]}")
 @app.get("/api/integrations")
 def integ():
     ol = "OFFLINE"
